@@ -1,6 +1,5 @@
 const got    = require('got');
-const crypto = require('crypto');
-const qs     = require('qs');
+const cryptoJS = require('crypto-js');
 
 // Public/Private method names
 const methods = {
@@ -17,26 +16,30 @@ const defaults = {
 
 // Create a signature for a request
 const getMessageSignature = (path, request, secret, nonce) => {
-	const message       = qs.stringify(request);
-	const secret_buffer = new Buffer(secret, 'base64');
-	const hash          = new crypto.createHash('sha256');
-	const hmac          = new crypto.createHmac('sha512', secret_buffer);
-	const hash_digest   = hash.update(nonce + message).digest('binary');
-	const hmac_digest   = hmac.update(path + hash_digest, 'binary').digest('base64');
-
-	return hmac_digest;
+        const message   = JSON.stringify(request);        
+        const secretBase64 = CryptoJS.enc.Base64.parse(secret);
+        const hashDigest = CryptoJS.SHA256(nonce + message);
+        const hmac = CryptoJS.algo.HMAC.create(CryptoJS.algo.SHA512, secretBase64);
+        
+	hmac.update(path);
+        hmac.update(hashDigest);
+        const hmacDigest = CryptoJS.enc.Base64.stringify(hmac.finalize());
+        
+	return hmacDigest;
 };
 
 // Send an API request
 const rawRequest = async (url, headers, data, timeout) => {
 	// Set custom User-Agent string
 	headers['User-Agent'] = 'Kraken Javascript API Client';
-
+	headers['Accept'] = 'application/x-www-form-urlencoded';
+	headers['Content-Type'] = 'application/json';
+	
 	const options = { headers, timeout };
 
 	Object.assign(options, {
 		method : 'POST',
-		body   : qs.stringify(data),
+		body   : JSON.stringify(data),
 	});
 
 	const { body } = await got(url, options);
